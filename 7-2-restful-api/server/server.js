@@ -60,5 +60,14 @@ app.put("/api/songs/:id", async (req, res) => {
     }
 });
 // /api/songs/:id (Delete song)
+app.delete("/api/songs/:id", async (req, res) => {
+    try {
+        const deleted= await Song.findByIdAndDelete(req.params.id);
+        if (!deleted) return res.status(404).json({ message: "Song not found" });
+        res.json(deleted);
+    } catch (err) {
+        res.status(500).json({ message: err.message||"Server error" });
+    }
+});
 
 app.listen(PORT, () => console.log(`API running on http://localhost:${PORT}`));
