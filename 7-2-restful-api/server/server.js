@@ -1,73 +1,102 @@
 import express from "express";
 import cors from "cors";
-
-// import dotenv and load environment variables from .env
 import dotenv from "dotenv";
-dotenv.config();        
+dotenv.config();
 
 import { connectDB } from "./db.js";
 import { Song } from "./models/song.model.js";
-
 const app = express();
 const PORT = process.env.PORT || 5174;
 
-app.use(cors());              
+app.use(cors());
 app.use(express.json());
 
-await connectDB(process.env.MONGO_URL);
+app.get("/", (req, res) => {
+    res.send("API server started!");
+});
 
-// api/songs (Read all songs)
+// Read all songs
 app.get("/api/songs", async (req, res) => {
     try {
-        const rows = await Song.find().sort({ createdAt: -1 });
-        res.json(rows);
+        const songs = await Song.find().sort({ createdAt: -1 });
+        res.json(songs);
     } catch (err) {
-        res.status(500).json({ message: err.message||"Server error" });
+        res.status(500).json({ message: err.message || "Failed to load songs" });
     }
 });
-// api/songs/:id (Read one song)
+
+// Read one song
 app.get("/api/songs/:id", async (req, res) => {
     try {
-        const s= await Song.findById(req.params.id);
-        if (!s) return res.status(404).json({ message: "Song not found" });
-        res.json(s);
+        const song = await Song.findById(req.params.id);
+
+        if (!song) {
+            return res.status(404).json({ message: "Song not found" });
+        }
+
+        res.json(song);
     } catch (err) {
-        res.status(500).json({ message: err.message||"Server error" });
+        res.status(400).json({ message: err.message || "Failed to load song" });
     }
 });
-// api/songs (Insert song)
+
+// Insert song
 app.post("/api/songs", async (req, res) => {
     try {
-        const { title="", artist="", year="" } = req.body;
-        const created= await Song.create({ title:title.trim(), artist:artist.trim(), year });
+        const { title = "", artist = "", year } = req.body || {};
+
+        const created = await Song.create({
+            title: title.trim(),
+            artist: artist.trim(),
+            year,
+        });
+
         res.status(201).json(created);
     } catch (err) {
-        res.status(500).json({ message: err.message||"Validation error" });
+        res.status(400).json({ message: err.message || "Validation error" });
     }
 });
-// /api/songs/:id (Update song)
+
+// Update song
 app.put("/api/songs/:id", async (req, res) => {
     try {
-        const updated= await Song.findByIdAndUpdate(
+        const updated = await Song.findByIdAndUpdate(
             req.params.id,
             req.body || {},
             { new: true, runValidators: true, context: "query" }
         );
-        if (!updated) return res.status(404).json({ message: "Song not found" });
+
+        if (!updated) {
+            return res.status(404).json({ message: "Song not found" });
+        }
+
         res.json(updated);
     } catch (err) {
-        res.status(500).json({ message: err.message||"Server error" });
-    }
-});
-// /api/songs/:id (Delete song)
-app.delete("/api/songs/:id", async (req, res) => {
-    try {
-        const deleted= await Song.findByIdAndDelete(req.params.id);
-        if (!deleted) return res.status(404).json({ message: "Song not found" });
-        res.json(deleted);
-    } catch (err) {
-        res.status(500).json({ message: err.message||"Server error" });
+        res.status(400).json({ message: err.message || "Update failed" });
     }
 });
 
-app.listen(PORT, () => console.log(`API running on http://localhost:${PORT}`));
+// Delete song
+app.delete("/api/songs/:id", async (req, res) => {
+    try {
+        const deleted = await Song.findByIdAndDelete(req.params.id);
+
+        if (!deleted) {
+            return res.status(404).json({ message: "Song not found" });
+        }
+
+        res.status(204).end();
+    } catch (err) {
+        res.status(400).json({ message: err.message || "Delete failed" });
+    }
+});
+
+connectDB(process.env.MONGO_URL)
+    .then(() => {
+        app.listen(PORT, () => {
+            console.log(`API running on http://localhost:${PORT}`);
+        });
+    })
+    .catch((err) => {
+        console.error("Failed to start:", err.message);
+    });
